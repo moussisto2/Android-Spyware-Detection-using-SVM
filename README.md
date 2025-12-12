@@ -1,14 +1,16 @@
 # Android Spyware Detection using Support Vector Machines (SVM)
 
-This repository contains a complete and reproducible machine learning pipeline for detecting Android spyware based on network traffic analysis. The project was developed as part of an academic research work and follows rigorous evaluation and preprocessing practices.
+This repository contains a complete and reproducible machine learning pipeline for detecting Android spyware using network traffic analysis.  
+The project follows rigorous academic machine learning practices and is designed to be fully reproducible.
 
 The system supports:
-- Binary classification: Normal traffic vs Spyware traffic
-- Multiclass classification: Identification of specific spyware families
+- **Binary classification**: Normal traffic vs Spyware traffic
+- **Multiclass classification**: Identification of specific spyware families
+
+---
 
 ## Project Structure
 
-android-spyware-svm/
 ```text
 android-spyware-svm/
 ├── data/
@@ -31,29 +33,51 @@ android-spyware-svm/
 ├── requirements.txt
 ├── README.md
 └── .gitignore
-## Dataset Description
 
-The dataset consists of network traffic captured from Android devices and exported as CSV files. It includes both benign traffic and multiple spyware families, covering background activity and installation phases.
+Dataset Description
 
-Classes included:
-- Normal (benign traffic)
-- Spyware families: FlexiSpy, MobileSpy, UMobix, TheWispy, Mspy
+The dataset consists of network traffic captured from Android devices and exported as CSV files.
+It includes both benign traffic and multiple spyware families, covering background activity and installation phases.
+
+Classes
+
+Normal (benign traffic)
+
+Spyware families
+
+FlexiSpy
+
+MobileSpy
+
+UMobix
+
+TheWispy
+
+Mspy
 
 Due to privacy, size, and licensing constraints, the dataset is not included in this repository.
 
-## Methodology
+Methodology
 
 The project follows a strict machine learning methodology to ensure valid and reproducible results:
-- Stratified train/test split
-- Stratified K-Fold cross-validation
-- Feature preprocessing using pipelines
-- Proper handling of categorical and numerical features
-- SMOTE applied only on training folds to avoid data leakage
-- Feature standardization
-- Linear Support Vector Machine classifier
-- Separate pipelines for binary and multiclass classification
 
-## Installation
+Stratified train/test split
+
+Stratified K-Fold cross-validation
+
+Feature preprocessing using pipelines
+
+Proper handling of categorical and numerical features
+
+SMOTE applied only on training folds to avoid data leakage
+
+Feature standardization
+
+Linear Support Vector Machine (SVM) classifier
+
+Separate pipelines for binary and multiclass classification
+
+Installation
 
 Clone the repository and install dependencies:
 
@@ -61,40 +85,80 @@ git clone https://github.com/YOUR_GITHUB_USERNAME/android-spyware-svm.git
 cd android-spyware-svm
 pip install -r requirements.txt
 
-## Usage
+Usage
 
-Place all CSV dataset files inside the data/ directory and run:
+Place all CSV dataset files inside the data/ directory.
+
+Run the training and evaluation script:
 
 python src/train_svm_spyware.py --outdir artifacts
 
-## Outputs
+Outputs
 
-The execution produces:
-- Trained binary and multiclass SVM models
-- Confusion matrices in image format
-- Detailed evaluation metrics in JSON and CSV formats
-- Cross-validation performance scores
+After execution, the following artifacts are generated:
 
-All outputs are saved in the specified output directory.
+Trained models:
 
-## Evaluation Metrics
+model_binary.joblib
 
-The system reports accuracy, precision, recall, F1-score, and confusion matrices for both classification tasks, allowing detailed analysis of spyware detection performance.
+model_multiclass.joblib
 
-## Reproducibility
+Confusion matrices (PNG format)
 
-Reproducibility is ensured through fixed random seeds, pipeline-based preprocessing, model serialization using joblib, and the absence of manual data manipulation.
+Detailed evaluation metrics (JSON and CSV)
 
-## Technologies Used
+Cross-validation performance scores
 
-Python, NumPy, Pandas, Scikit-learn, Imbalanced-learn, Matplotlib
+All outputs are saved inside the specified output directory (default: artifacts/).
 
-## Author
+Evaluation Metrics
 
-Moussamb Mohamed Oussein Dahalani  
-Master 2 – Distributed Artificial Intelligence  
+The system reports:
+
+Accuracy
+
+Precision
+
+Recall
+
+F1-score
+
+Confusion matrices for both binary and multiclass tasks
+
+Per-class performance analysis
+
+This allows a detailed understanding of spyware detection performance and class separability.
+
+Reproducibility
+
+Reproducibility is ensured through:
+
+Fixed random seeds
+
+Pipeline-based preprocessing
+
+Proper cross-validation strategy
+
+Model serialization using joblib
+
+No manual data manipulation outside the pipeline
+
+Technologies Used
+
+Python 3
+
+NumPy
+
+Pandas
+
+Scikit-learn
+
+Imbalanced-learn
+
+Matplotlib
+
+Author
+
+Moussamb Mohamed Oussein Dahalani
+Master 2 – Distributed Artificial Intelligence
 Université Paris Cité
-
-## License
-
-This project is intended for academic and research purposes only.
