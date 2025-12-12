@@ -9,6 +9,8 @@ The system supports:
 ## Project Structure
 
 android-spyware-svm/
+```text
+android-spyware-svm/
 ├── data/
 │   ├── Normal.csv
 │   ├── FlexiSpy.csv
@@ -22,12 +24,13 @@ android-spyware-svm/
 │   ├── UMobix_Installation.csv
 │   ├── TheWispy_Installation.csv
 │   └── Mspy_Installation.csv
+│
 ├── src/
 │   └── train_svm_spyware.py
+│
 ├── requirements.txt
 ├── README.md
 └── .gitignore
-
 ## Dataset Description
 
 The dataset consists of network traffic captured from Android devices and exported as CSV files. It includes both benign traffic and multiple spyware families, covering background activity and installation phases.
