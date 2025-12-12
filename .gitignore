@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+
+# Models & outputs
+artifacts/
+*.joblib
+*.png
+*.csv
+
+# Notebooks
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
