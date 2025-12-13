@@ -34,7 +34,6 @@ class Config:
     test_size: float = 0.20
     n_splits: int = 5
 
-    # Column names expected in CSVs
     drop_cols: Tuple[str, ...] = ("No.",)
     label_col: str = "Label"
 
@@ -46,7 +45,6 @@ class Config:
 # Data loading / cleaning
 # ----------------------------
 def fix_data_errors(df: pd.DataFrame) -> pd.DataFrame:
-    # Robust numeric parsing
     for col in ["Time", "Length"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
@@ -56,42 +54,47 @@ def fix_data_errors(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_one_csv(path: str, label: str, cfg: Config) -> pd.DataFrame:
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"CSV not found: {path}")
+
     df = pd.read_csv(path)
     df = fix_data_errors(df)
 
-    # Drop columns if present
     for c in cfg.drop_cols:
         if c in df.columns:
             df = df.drop(columns=[c])
 
-    # Ensure required columns exist (create if missing)
     for c in cfg.categorical_cols + cfg.numeric_cols:
         if c not in df.columns:
             df[c] = np.nan
 
     df[cfg.label_col] = label
-    df = df.drop_duplicates()
-    df = df.reset_index(drop=True)
+    df = df.drop_duplicates().reset_index(drop=True)
     return df
 
 
-def load_dataset(datasets: Dict[str, Union[str, List[str]]], cfg: Config) -> pd.DataFrame:
+def load_dataset(
+    datasets: Dict[str, Union[str, List[str]]],
+    data_dir: str,
+    cfg: Config
+) -> pd.DataFrame:
     frames = []
     for label, files in datasets.items():
         if isinstance(files, list):
-            for f in files:
-                frames.append(load_one_csv(f, label, cfg))
+            for fname in files:
+                path = os.path.join(data_dir, fname)
+                frames.append(load_one_csv(path, label, cfg))
         else:
-            frames.append(load_one_csv(files, label, cfg))
-    data = pd.concat(frames, ignore_index=True)
-    return data
+            path = os.path.join(data_dir, files)
+            frames.append(load_one_csv(path, label, cfg))
+
+    return pd.concat(frames, ignore_index=True)
 
 
 # ----------------------------
 # Pipeline building
 # ----------------------------
 def build_preprocessor(cfg: Config) -> ColumnTransformer:
-    # We use OrdinalEncoder (NOT LabelEncoder) and fit ONCE on training data.
     cat_pipe = SkPipeline(steps=[
         ("imputer", SimpleImputer(strategy="most_frequent")),
         ("encoder", OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)),
@@ -101,7 +104,7 @@ def build_preprocessor(cfg: Config) -> ColumnTransformer:
         ("imputer", SimpleImputer(strategy="median")),
     ])
 
-    preprocessor = ColumnTransformer(
+    return ColumnTransformer(
         transformers=[
             ("cat", cat_pipe, list(cfg.categorical_cols)),
             ("num", num_pipe, list(cfg.numeric_cols)),
@@ -109,16 +112,9 @@ def build_preprocessor(cfg: Config) -> ColumnTransformer:
         remainder="drop",
         verbose_feature_names_out=False
     )
-    return preprocessor
 
 
 def build_model_pipeline(cfg: Config, categorical_count: int) -> ImbPipeline:
-    """
-    Preprocess -> SMOTENC -> Scale -> LinearSVC
-    SMOTENC needs categorical feature indices in the *preprocessed* array.
-    With our ColumnTransformer order: [cats..., nums...]
-    so categorical indices are range(0, categorical_count).
-    """
     preprocessor = build_preprocessor(cfg)
 
     smote = SMOTENC(
@@ -128,18 +124,17 @@ def build_model_pipeline(cfg: Config, categorical_count: int) -> ImbPipeline:
 
     clf = LinearSVC(
         C=1.0,
-        class_weight="balanced",   # helps with imbalance even before SMOTE
+        class_weight="balanced",
         dual="auto",
         random_state=cfg.random_state
     )
 
-    pipe = ImbPipeline(steps=[
+    return ImbPipeline(steps=[
         ("preprocess", preprocessor),
         ("smote", smote),
         ("scale", StandardScaler()),
         ("clf", clf),
     ])
-    return pipe
 
 
 # ----------------------------
@@ -158,9 +153,7 @@ def save_confusion_matrix(y_true, y_pred, labels, title, out_png):
 
 
 def metrics_dict(y_true, y_pred, average="weighted", pos_label=None) -> Dict[str, float]:
-    out = {
-        "accuracy": float(accuracy_score(y_true, y_pred)),
-    }
+    out = {"accuracy": float(accuracy_score(y_true, y_pred))}
     if pos_label is not None:
         out["precision"] = float(precision_score(y_true, y_pred, pos_label=pos_label))
         out["recall"] = float(recall_score(y_true, y_pred, pos_label=pos_label))
@@ -177,13 +170,14 @@ def metrics_dict(y_true, y_pred, average="weighted", pos_label=None) -> Dict[str
 # ----------------------------
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--data-dir", default="data", help="Folder containing the CSV datasets")
     parser.add_argument("--outdir", default="artifacts", help="Where to save models/reports")
     args = parser.parse_args()
 
     cfg = Config()
     os.makedirs(args.outdir, exist_ok=True)
 
-    # Your dataset mapping (same as your old code)
+    # Dataset filenames (located in args.data_dir)
     datasets = {
         "Normal": "Normal.csv",
         "FlexiSpy_B": "FlexiSpy.csv",
@@ -198,17 +192,16 @@ def main():
         "Mspy_C": "Mspy_Installation.csv"
     }
 
-    data = load_dataset(datasets, cfg)
+    # Load from folder
+    data = load_dataset(datasets, args.data_dir, cfg)
 
-    # Split X/y
     X = data.drop(columns=[cfg.label_col])
     y = data[cfg.label_col].astype(str)
 
-    # Common CV
     skf = StratifiedKFold(n_splits=cfg.n_splits, shuffle=True, random_state=cfg.random_state)
 
     # ============================
-    # 1) Binary task: Normal vs Spyware
+    # 1) Binary task
     # ============================
     y_bin = y.where(y == "Normal", other="Spyware")
 
@@ -221,12 +214,10 @@ def main():
 
     bin_pipe = build_model_pipeline(cfg, categorical_count=len(cfg.categorical_cols))
 
-    # Proper CV (SMOTE happens inside each fold)
     bin_cv_scores = cross_val_score(bin_pipe, X_train, y_train, cv=skf, scoring="accuracy")
     print("\n[BINARY] CV scores:", bin_cv_scores)
     print("[BINARY] Mean CV accuracy: %.2f%%" % (100 * bin_cv_scores.mean()))
 
-    # Fit and evaluate
     bin_pipe.fit(X_train, y_train)
     y_pred = bin_pipe.predict(X_test)
 
@@ -241,11 +232,10 @@ def main():
         title="Confusion Matrix - Binary (Normal vs Spyware)",
         out_png=os.path.join(args.outdir, "cm_binary.png")
     )
-
     joblib.dump(bin_pipe, os.path.join(args.outdir, "model_binary.joblib"))
 
     # ============================
-    # 2) Multiclass task: all labels
+    # 2) Multiclass task
     # ============================
     X_train, X_test, y_train, y_test = train_test_split(
         X, y,
@@ -274,10 +264,8 @@ def main():
         title="Confusion Matrix - Multiclass",
         out_png=os.path.join(args.outdir, "cm_multiclass.png")
     )
-
     joblib.dump(multi_pipe, os.path.join(args.outdir, "model_multiclass.joblib"))
 
-    # Save JSON summary + confusion matrices table
     summary = {
         "binary": {
             "cv_scores": bin_cv_scores.tolist(),
@@ -299,9 +287,6 @@ def main():
     pd.DataFrame(multi_cm, index=labels_sorted, columns=labels_sorted).to_csv(os.path.join(args.outdir, "cm_multiclass.csv"))
 
     print(f"\nDone. Artifacts saved in: {args.outdir}/")
-    print(" - model_binary.joblib, model_multiclass.joblib")
-    print(" - cm_binary.png, cm_multiclass.png")
-    print(" - metrics_summary.json, cm_binary.csv, cm_multiclass.csv")
 
 
 if __name__ == "__main__":
